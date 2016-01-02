@@ -16,12 +16,13 @@ void morphImage(Mat &img);
 void showImgContours(Mat &threshedimg, Mat original, int index);
 
 bool morph = false;
-bool detectRed = false;
-bool detectBlue = false;
+bool detectRed = true;
+bool detectBlue = true;
 bool detectYellow = false;
 bool showContours = false;
 
 string imageString;
+string videoString;
 
 int oldImg = 1;
 int img = 1;
@@ -37,9 +38,46 @@ int eSizeX = 3;
 int eSizeY = 4;
 
 Mat bgrImage;
+Mat temp;
 
 int main(int argc, char** argv)
 {
+	//Mat frame;
+	//Mat low;
+	//Mat high;
+
+	//videoString = argv[1];
+	//VideoCapture capture(videoString);
+
+	//if (!capture.isOpened())
+	//{
+	//	throw "Cannot open video";
+	//}
+
+	//int i = 0;
+	//for (;;)
+	//{
+	//	capture >> frame;
+	//	if (frame.empty())
+	//	{
+	//		break;
+	//	}
+	//	
+	//	frame.copyTo(temp);
+
+	//	cvtColor(temp, frame, CV_BGR2HSV);// Convert image from BGR to HSV space (OpenCV stores images in BGR)
+	//	inRange(frame, Scalar(hMin, sMin, vMin), Scalar(hMax, sMax, vMax), low);
+	//	inRange(frame, Scalar(160, 100, 50), Scalar(180, 255, 255), high);
+	//	addWeighted(low, 1.0, high, 1.0, 0.0, frame, -1);
+
+	//	morphImage(frame);
+
+	//	showImgContours(frame, temp, 1);
+
+	//	waitKey(1);
+	//}
+	//waitKey(0);
+
 	imageString = argv[1];
 
 	createTrackbars();
@@ -81,7 +119,6 @@ int main(int argc, char** argv)
 
 		if (detectBlue)
 		{
-
 			/*
 			int hMin = 100;
 			int hMax = 125;
@@ -97,20 +134,19 @@ int main(int argc, char** argv)
 		}
 
 		if (detectYellow)
-		{
-
+		{	
 			/*
-			int hMin = 100;
-			int hMax = 125;
-			int sMin = 110;
+			int hMin = 20;
+			int hMax = 30;
+			int sMin = 100;
 			int sMax = 255;
-			int vMin = 40;
+			int vMin = 100;
 			int vMax = 255;
 			*/
 
 			Mat low, high;
 			cvtColor(bgrImage, hsvImage, CV_BGR2HSV);
-			inRange(hsvImage, Scalar(hMin, sMin, vMin), Scalar(hMax, sMax, vMax), imageDetectYellow);
+			inRange(hsvImage, Scalar(20, 100, 100), Scalar(30, 255, 255), imageDetectYellow);
 		}
 		
 		// Apply erosion and dilatation to get rid of some noise
@@ -151,7 +187,7 @@ void createTrackbars()
 {
 	namedWindow("Trackbars", WINDOW_NORMAL);
 	createTrackbar("image", "Trackbars", &img, SAMPLES_NO, onTrackbar);
-	createTrackbar("hMin", "Trackbars", &hMin, 180, onTrackbar);
+	createTrackbar("hMin", "Trackbars", &hMin, 1000, onTrackbar);
 	createTrackbar("hMax", "Trackbars", &hMax, 180, onTrackbar);
 	createTrackbar("sMin", "Trackbars", &sMin, 255, onTrackbar);
 	createTrackbar("sMax", "Trackbars", &sMax, 255, onTrackbar);
@@ -216,24 +252,32 @@ void showImgContours(Mat &threshedimg, Mat original, int index)
 	findContours(threshedimg, contours, hierarchy, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE);
 
 	if (contours.size() > 0)
-	{
+	{			   
 		int i = 0;
+		CvScalar color;
+		vector<Point> currentContour;
+		Rect currentBoundRect;
 		for (vector<Point> contour : contours)
 		{
-			if (contourArea(contour, false) > 400)
+			approxPolyDP(Mat(contour), currentContour, 3, true);
+			currentBoundRect = boundingRect(Mat(currentContour));
+
+			if (contourArea(contour, false) > 200)
 			{
 				if (index == 0)
 				{
-					drawContours(original, contours, i, CV_RGB(0, 255, 0), 2, 8, hierarchy);
+					color = CV_RGB(0, 255, 0);
 				}
 				if (index == 1)
 				{
-					drawContours(original, contours, i, CV_RGB(255, 0, 0), 2, 8, hierarchy);
+					color = CV_RGB(255, 0, 0);
 				}
 				if (index == 2)
 				{
-					drawContours(original, contours, i, CV_RGB(0, 0, 255), 2, 8, hierarchy);
+					color = CV_RGB(0, 0, 255);
 				}
+				//drawContours(original, contours, i, color, 2, 8, hierarchy);
+				rectangle(original, currentBoundRect.tl(), currentBoundRect.br(), color, 2, 8, 0);
 			}
 			i++;
 		}

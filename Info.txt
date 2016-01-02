@@ -1,0 +1,13 @@
+1. Extagerea trasaturilor pentru semnele de trafic (atat pentru regiunile care raman dupa thresholding cat si pentru semnele din baza de imagini de antrenare):
+a)  histograma de culori - 3 histograme pe h s v
+b)  histograma orientarii muchiilor
+
+2. Aplicarea unei functii de clasificare:
+a) interesectia histogramelor (histogram intersection), sau distanta euclidiana:
+- pt fiecare imagine de antrenare avem vectorii de histograma  (hi) ; pt regiunea de interes (unde vrei sa recunosti semnul ) avem un alt vector (hr)
+se calculeaza distanta dintre fiecare hi si hr si se returneaza acel semn care are distanta cea mai mica
+
+b) clasificator svm  - 
+Pentru toate exemplele din baza de imagini de antrenare se extrag trasturile (histogramele) si ele vor fi trasturile folosite la antrenarea unui model de clasificare de tip SVM (clasificator multi-clasa)
+
+Pentru o regiune de interes se calculeaza hr si se da ca intrare la modelul de clasificare. si se afiseaza raspunsul clasificatorului.
