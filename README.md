@@ -16,7 +16,7 @@ After you make sure that the code is compiling you will need to have the followi
     │   ├── 0.png                  # Random images you want to do the detection on
     │   ├── 1.png
     │   ├── ...
-    │   ├── Training               # Training images downloaded from here [here] (http://benchmark.ini.rub.de/?section=gtsdb&subsection=dataset)
+    │   ├── Training               # Training images downloaded at Requirements step
     │   |   ├── 00
     │   |   |   ├── 00000.ppm
     │   |   |   ├── 00001.ppm
