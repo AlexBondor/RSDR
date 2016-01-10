@@ -10,22 +10,30 @@ In order to run this project you will need the following:
 
 ## Setup
 After you make sure that the code is compiling you will need to have the following project directory tree:
-├── root
-|   ├── Images
-|   |   ├── 0.png
-|   |   ├── 1.png
-└── README.md
-- root
-  - Images
-    0.png
-    1.png
-    ...
-    - Training
-      - 00
-        - 00000.ppm
-        ...
-      - 01
-        - 00000.ppm
-        ...
-      ...
-  -
+
+    .
+    ├── Images                     # Images files
+    │   ├── 0.png                  # Random images you want to do the detection on
+    │   ├── 1.png
+    │   ├── ...
+    │   ├── Training               # Training images downloaded from here [here] (http://benchmark.ini.rub.de/?section=gtsdb&subsection=dataset)
+    │   |   ├── 00
+    │   |   |   ├── 00000.ppm
+    │   |   |   ├── 00001.ppm
+    │   |   |   └── ...
+    │   |   ├── 01
+    │   |   |   ├── 00000.ppm
+    │   |   |   ├── 00001.ppm
+    │   |   |   └── ...
+    │   |   └── ...
+    │   └── ...
+    └── Project                    # Project files
+    
+## Running
+Set the executable arguments to:
+<br>
+`argv[1] = <project_root_folder>/Images/Training`
+<br>
+`argv[2] = <project_root_folder>/Images/1.png`
+
+## Have fun!
