@@ -6,7 +6,15 @@
 using namespace cv;
 using namespace std;
 
-#define SAMPLES_NO 5
+#define SAMPLES_NO 7
+#define TRAINING_SET_SUBFOLDERS 43
+
+struct myMatND {
+	MatND h, s, v;
+};
+
+vector<vector<String>> filenames(TRAINING_SET_SUBFOLDERS);
+vector<vector<myMatND>> dbHistograms(TRAINING_SET_SUBFOLDERS);
 
 // Function headers
 void onTrackbar(int, void*);
@@ -14,12 +22,15 @@ void createTrackbars();
 void toggle(int key);
 void morphImage(Mat &img);
 void showImgContours(Mat &threshedimg, Mat original, int index);
+bool loadTrainingSet(char* source);
+bool computeDbHistograms();
 
 bool morph = false;
-bool detectRed = true;
-bool detectBlue = true;
+bool detectRed = false;
+bool detectBlue = false;
 bool detectYellow = false;
 bool showContours = false;
+bool detectSigns = false;
 
 string imageString;
 string videoString;
@@ -42,6 +53,16 @@ Mat temp;
 
 int main(int argc, char** argv)
 {
+	if (!loadTrainingSet(argv[1]))
+	{
+		printf("Cannot load training set images");
+		return 0;
+	}
+	
+	// Training set images paths successfully loaded in global filenames vector
+
+	computeDbHistograms();
+
 	//Mat frame;
 	//Mat low;
 	//Mat high;
@@ -78,7 +99,7 @@ int main(int argc, char** argv)
 	//}
 	//waitKey(0);
 
-	imageString = argv[1];
+	imageString = argv[2];
 
 	createTrackbars();
 
@@ -214,6 +235,8 @@ void toggle(int key)
 		detectYellow = !detectYellow;
 	if (key == 'c')
 		showContours = !showContours;
+	if (key == 'd')
+		detectSigns = !detectSigns;
 }
 
 void onTrackbar(int, void*)
@@ -249,7 +272,7 @@ void showImgContours(Mat &threshedimg, Mat original, int index)
 	vector<vector<Point>> contours;
 	vector<Vec4i> hierarchy;
 
-	findContours(threshedimg, contours, hierarchy, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE);
+	findContours(threshedimg, contours, hierarchy, RETR_EXTERNAL, CV_CHAIN_APPROX_SIMPLE);
 
 	if (contours.size() > 0)
 	{			   
@@ -262,7 +285,9 @@ void showImgContours(Mat &threshedimg, Mat original, int index)
 			approxPolyDP(Mat(contour), currentContour, 3, true);
 			currentBoundRect = boundingRect(Mat(currentContour));
 
-			if (contourArea(contour, false) > 200)
+			double ratio = currentBoundRect.width > currentBoundRect.height ? ((double)currentBoundRect.width) / currentBoundRect.height : ((double)currentBoundRect.height) / currentBoundRect.width;
+
+			if (contourArea(contour, false) > 150 && ratio < 1.5)
 			{
 				if (index == 0)
 				{
@@ -278,9 +303,146 @@ void showImgContours(Mat &threshedimg, Mat original, int index)
 				}
 				//drawContours(original, contours, i, color, 2, 8, hierarchy);
 				rectangle(original, currentBoundRect.tl(), currentBoundRect.br(), color, 2, 8, 0);
+
+				if (detectSigns)
+				{
+					Mat imgPart;
+					original(currentBoundRect).copyTo(imgPart);
+
+					// Compare histograms
+					vector<Mat> hsvPlanes;
+					int hSize = 181;
+					int svSize = 256;
+
+					// Set the ranges for H, S, V channels
+					float hRng[] = { 0, 180 };
+					float sRng[] = { 0, 255 };
+					float vRng[] = { 0, 255 };
+					const float* hRange = { hRng };
+					const float* sRange = { sRng };
+					const float* vRange = { vRng };
+
+					// We want our bins to have the same size (uniform) and 
+					// to clear the histograms in the beginning, so
+					bool uniform = true;
+					bool accumulate = false;
+
+					cvtColor(imgPart, imgPart, CV_BGR2HSV);
+					split(imgPart, hsvPlanes);
+					double max = 0;
+					int indexI, indexJ;
+
+					for (int j = 0; j < TRAINING_SET_SUBFOLDERS; j++)
+					{
+						int k = 0;
+						for (myMatND dbMatND : dbHistograms[j])
+						{
+							MatND hTemp, sTemp, vTemp;
+							double result = 0;
+
+							calcHist(&hsvPlanes[0], 1, 0, Mat(), hTemp, 1, &hSize, &hRange, uniform, accumulate);
+							normalize(hTemp, hTemp, 0, 1, NORM_MINMAX, -1, Mat());
+							result += compareHist(hTemp, dbMatND.h, 0);
+
+							calcHist(&hsvPlanes[1], 1, 0, Mat(), sTemp, 1, &svSize, &sRange, uniform, accumulate);
+							normalize(sTemp, sTemp, 0, 1, NORM_MINMAX, -1, Mat());
+							result += compareHist(sTemp, dbMatND.s, 0);
+
+							calcHist(&hsvPlanes[2], 1, 0, Mat(), vTemp, 1, &svSize, &vRange, uniform, accumulate);
+							normalize(vTemp, vTemp, 0, 1, NORM_MINMAX, -1, Mat());
+							result += compareHist(vTemp, dbMatND.v, 0);
+
+							if (result > max)
+							{
+								max = result;
+								indexI = j;
+								indexJ = k;
+							}
+							k++;
+						}
+					}
+					putText(original, to_string(indexI).append(" ").append(to_string(indexJ)), { currentBoundRect.tl().x, currentBoundRect.tl().y - 10 }, 0, 0.5, color, 1, 8, false);
+					putText(original, to_string(max), { currentBoundRect.tl().x, currentBoundRect.tl().y }, 0, 0.5, color, 1, 8, false);
+				}
+				i++;
 			}
-			i++;
 		}
 		imshow("Result", original);
 	}
+}
+
+bool loadTrainingSet(char* source)
+{
+	size_t len = strlen(source);
+
+	char* path = new char[len + 2];
+
+	strcpy(path, source);
+	path[len] = '\\';
+	path[len + 1] = '\0';
+
+	for (int i = 0; i < TRAINING_SET_SUBFOLDERS; i++)
+	{
+		string no = to_string(i);
+		if (i < 10)
+		{
+			no.insert(0, "0");
+		}
+		no.insert(0, path);
+		no.append("\\*.ppm");
+		glob(no, filenames[i], false);
+		dbHistograms[i].resize(filenames[i].size());
+	}
+	return true;
+}
+
+bool computeDbHistograms()
+{
+	Mat currentImage;
+	vector<Mat> hsvPlanes;
+
+	int hSize = 181;
+	int svSize = 256;
+
+	// Set the ranges for H, S, V channels
+	float hRng[] = { 0, 180 };
+	float sRng[] = { 0, 255 };
+	float vRng[] = { 0, 255 };
+	const float* hRange = { hRng };
+	const float* sRange = { sRng };
+	const float* vRange = { vRng };
+
+	// We want our bins to have the same size (uniform) and 
+	// to clear the histograms in the beginning, so
+	bool uniform = true; 
+	bool accumulate = false;
+
+	for (int i = 0; i < TRAINING_SET_SUBFOLDERS; i++)
+	{
+		int j = 0;
+		for (String filename : filenames[i])
+		{
+			currentImage = imread(filename, IMREAD_COLOR);
+
+			cvtColor(currentImage, currentImage, CV_BGR2HSV);
+			split(currentImage, hsvPlanes);
+
+			calcHist(&hsvPlanes[0], 1, 0, Mat(), dbHistograms[i][j].h, 1, &hSize, &hRange, uniform, accumulate);
+			normalize(dbHistograms[i][j].h, dbHistograms[i][j].h, 0, 1, NORM_MINMAX, -1, Mat());
+
+			calcHist(&hsvPlanes[1], 1, 0, Mat(), dbHistograms[i][j].s, 1, &svSize, &sRange, uniform, accumulate);
+			normalize(dbHistograms[i][j].s, dbHistograms[i][j].s, 0, 1, NORM_MINMAX, -1, Mat());
+
+			calcHist(&hsvPlanes[2], 1, 0, Mat(), dbHistograms[i][j].v, 1, &svSize, &vRange, uniform, accumulate);
+			normalize(dbHistograms[i][j].v, dbHistograms[i][j].v, 0, 1, NORM_MINMAX, -1, Mat());
+
+			/// Compute the histograms:
+			//calcHist(&hsvPlanes[0], 1, 0, Mat(), dbHistograms[i][j][0], 1, &hSize, &hRange, uniform, accumulate);
+			//calcHist(&hsvPlanes[1], 1, 0, Mat(), dbHistograms[i][j][1], 1, &svSize, &sRange, uniform, accumulate);
+			//calcHist(&hsvPlanes[2], 1, 0, Mat(), dbHistograms[i][j][2], 1, &svSize, &vRange, uniform, accumulate);
+
+			j++;
+		}
+	}
+	return true;
 }
